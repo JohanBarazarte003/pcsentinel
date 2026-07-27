@@ -1,0 +1,48 @@
+@import "tailwindcss";
+
+/* 
+  ==========================================================================
+  SISTEMA DE DISEÑO OFICIAL - PC SENTINEL (TAILWIND CSS V4)
+  ==========================================================================
+*/
+
+@theme {
+  /* Paleta de Colores de Marca */
+  --color-sentinel-dark: #0f172a;     /* Navy Oscuro - Fondos Principales / Hero */
+  --color-sentinel-emerald: #10b981;  /* Esmeralda - Estados OK / Botón Principal */
+  --color-sentinel-blue: #3b82f6;     /* Azul Métricas - Gráficos / Renders */
+  --color-sentinel-light: #f1f5f9;    /* Gris Claro - Cards y Tablas Modo Claro */
+  --color-sentinel-slate: #64748b;    /* Gris Secundario - Textos Muted y Bordes */
+  --color-sentinel-danger: #ef4444;   /* Rojo Alerta - Temperaturas Altas / Fallo SSD */
+  --color-sentinel-warning: #f59e0b;  /* Naranja - Advertencias de Uso de RAM/Disco */
+
+  /* Tipografía */
+  --font-sans: var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+/* 
+  Estilos Base y Reset Profesional
+*/
+@layer base {
+  body {
+    background-color: var(--color-sentinel-dark);
+    color: #f8fafc;
+    font-family: var(--font-sans);
+    overflow-x: hidden;
+  }
+}
+
+/* 
+  Efectos Visuales Premium (Glassmorphism & Cards)
+*/
+.glass-panel {
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.glass-card-light {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+}

@@ -1,0 +1,22 @@
+#node
+
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/.env.local
+
+#Python
+
+  agent/venv/
+  agent/__pycache__/
+  agent/build/
+  agent/dist/
+  *.pyc
+
+
+#IDEs
+
+.vscode/
+.idea/
+.DS_Store
+
