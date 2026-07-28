@@ -1,5 +1,6 @@
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { Sidebar } from "@/components/dashboard/Sidebar";
+import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { 
   Monitor, 
   AlertTriangle, 
@@ -13,13 +14,27 @@ import {
 export default async function DashboardPage() {
   const supabase = await createServerSupabaseClient();
 
-  // 1. Consultar computadoras registradas en Supabase
+  // 1. Obtener el usuario autenticado actual
+  const { data: { user } } = await supabase.auth.getUser();
+
+  // 2. Obtener la organización del usuario
+  const { data: organization } = await supabase
+    .from("organizations")
+    .select("id, name")
+    .eq("owner_id", user?.id)
+    .single();
+
+  const orgId = organization?.id || "";
+  const orgName = organization?.name || "Mi Organización";
+
+  // 3. Consultar las computadoras pertenecientes a esta organización
   const { data: devices } = await supabase
     .from("devices")
     .select("*, telemetry_logs(cpu_percent, ram_percent, cpu_temp, created_at)")
+    .eq("org_id", orgId)
     .order("last_seen", { ascending: false });
 
-  // Métricas para los Stat Cards
+  // Métricas dinámicas para las tarjetas de estadísticas
   const totalDevices = devices?.length || 0;
   const onlineDevices = devices?.filter(d => d.status === "online").length || 0;
   const warningDevices = devices?.filter(d => d.status === "warning" || d.status === "critical").length || 0;
@@ -27,31 +42,18 @@ export default async function DashboardPage() {
   return (
     <div className="flex min-h-screen bg-sentinel-light text-slate-800">
       
-      {/* Sidebar Navegación Lateral (Modo Oscuro) */}
+      {/* Sidebar Navegación Lateral */}
       <Sidebar />
 
-      {/* Área Principal de Trabajo (Modo Claro / Limpio) */}
+      {/* Área Principal */}
       <main className="flex-1 p-8 overflow-y-auto">
         
-        {/* Header Superior */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Resumen</h1>
-            <p className="text-sm text-slate-500 mt-0.5">Estado general de tus equipos monitoreados</p>
-          </div>
-          
-          <div className="flex items-center gap-3">
-            <span className="text-xs font-semibold px-3 py-1.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              Servicio de Alertas Activo
-            </span>
-          </div>
-        </div>
+        {/* Header Dinámico con Botón de Vincular Computadora */}
+        <DashboardHeader orgName={orgName} orgId={orgId} />
 
-        {/* 4 Cards de Resumen Principal (Stats Cards) */}
+        {/* 4 Cards de Resumen Principal */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
           
-          {/* Card 1: Equipos en Línea */}
           <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col justify-between">
             <div className="flex justify-between items-start">
               <div>
@@ -66,11 +68,10 @@ export default async function DashboardPage() {
             </div>
             <div className="flex items-center gap-1 text-xs font-medium text-emerald-600 mt-4">
               <ArrowUpRight className="w-4 h-4" />
-              <span>14% respecto a la semana pasada</span>
+              <span>Sistemas activos y respondiendo</span>
             </div>
           </div>
 
-          {/* Card 2: Alertas Críticas */}
           <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col justify-between">
             <div className="flex justify-between items-start">
               <div>
@@ -85,11 +86,10 @@ export default async function DashboardPage() {
             </div>
             <div className="flex items-center gap-1 text-xs font-medium text-rose-600 mt-4">
               <ArrowDownRight className="w-4 h-4" />
-              <span>Atención requerida en 2 equipos</span>
+              <span>Equipos con advertencias</span>
             </div>
           </div>
 
-          {/* Card 3: Rendimiento Promedio */}
           <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col justify-between">
             <div className="flex justify-between items-start">
               <div>
@@ -102,11 +102,10 @@ export default async function DashboardPage() {
             </div>
             <div className="flex items-center gap-1 text-xs font-medium text-emerald-600 mt-4">
               <ArrowUpRight className="w-4 h-4" />
-              <span>8% optimización de carga</span>
+              <span>Carga de trabajo óptima</span>
             </div>
           </div>
 
-          {/* Card 4: Tiempo de Actividad */}
           <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col justify-between">
             <div className="flex justify-between items-start">
               <div>
@@ -119,16 +118,15 @@ export default async function DashboardPage() {
             </div>
             <div className="flex items-center gap-1 text-xs font-medium text-emerald-600 mt-4">
               <ArrowUpRight className="w-4 h-4" />
-              <span>0.4% estabilidad de red</span>
+              <span>Estabilidad del servicio</span>
             </div>
           </div>
 
         </div>
 
-        {/* Sección Inferior: Tabla de Estado de Equipos y Alertas Recientes */}
+        {/* Tabla de Equipos de la Organización */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           
-          {/* Tabla de Equipos (8 Columnas) */}
           <div className="lg:col-span-8 bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
             <div className="p-6 border-b border-slate-100 flex items-center justify-between">
               <h2 className="text-base font-bold text-slate-900">Estado de los equipos</h2>
@@ -183,8 +181,9 @@ export default async function DashboardPage() {
                     })
                   ) : (
                     <tr>
-                      <td colSpan={6} className="px-6 py-8 text-center text-slate-400 text-sm">
-                        No hay equipos registrados aún. Ejecuta el Agente de Windows para vincular la primera PC.
+                      <td colSpan={6} className="px-6 py-12 text-center text-slate-400 text-sm">
+                        No hay computadoras vinculadas a <strong className="text-slate-700">{orgName}</strong>.<br />
+                        Haz clic en <strong className="text-sentinel-emerald">"+ Vincular Computadora"</strong> para conectar tu primer equipo.
                       </td>
                     </tr>
                   )}
@@ -193,55 +192,24 @@ export default async function DashboardPage() {
             </div>
           </div>
 
-          {/* Widget de Alertas Recientes (4 Columnas) */}
+          {/* Widget Lateral de Alertas */}
           <div className="lg:col-span-4 bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6 flex flex-col justify-between">
             <div>
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-base font-bold text-slate-900">Alertas recientes</h2>
-                <button className="text-xs font-semibold text-sentinel-blue hover:underline">Ver todas</button>
+                <h2 className="text-base font-bold text-slate-900">Alertas del sistema</h2>
+                <span className="text-xs font-semibold text-slate-400">Filtrado por org</span>
               </div>
 
               <div className="space-y-4">
-                
-                <div className="flex items-start gap-3.5 p-3 rounded-xl bg-rose-50/60 border border-rose-100">
-                  <div className="p-2 bg-rose-100 text-rose-600 rounded-lg shrink-0 mt-0.5">
-                    <AlertTriangle className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-bold text-slate-900">Temperatura Alta</h4>
-                    <p className="text-xs text-slate-500 mt-0.5">OFFICE-PC-01 alcanzó los 72°C en CPU</p>
-                    <span className="text-[10px] text-slate-400 mt-1 block">Hace 5 min</span>
-                  </div>
+                <div className="p-4 rounded-xl bg-slate-50 border border-slate-100 text-xs text-slate-500 text-center py-8">
+                  No hay alertas críticas en esta organización.
                 </div>
-
-                <div className="flex items-start gap-3.5 p-3 rounded-xl bg-amber-50/60 border border-amber-100">
-                  <div className="p-2 bg-amber-100 text-amber-600 rounded-lg shrink-0 mt-0.5">
-                    <Activity className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-bold text-slate-900">Uso de Disco Alto</h4>
-                    <p className="text-xs text-slate-500 mt-0.5">LAPTOP-04K2LM está al 87% de capacidad</p>
-                    <span className="text-[10px] text-slate-400 mt-1 block">Hace 15 min</span>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3.5 p-3 rounded-xl bg-blue-50/60 border border-blue-100">
-                  <div className="p-2 bg-blue-100 text-blue-600 rounded-lg shrink-0 mt-0.5">
-                    <Monitor className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-bold text-slate-900">Actualización Disponible</h4>
-                    <p className="text-xs text-slate-500 mt-0.5">DESKTOP-7G3H2K requiere driver Intel GPU</p>
-                    <span className="text-[10px] text-slate-400 mt-1 block">Hace 1 hora</span>
-                  </div>
-                </div>
-
               </div>
             </div>
 
             <div className="pt-6 border-t border-slate-100 text-center">
               <span className="text-xs text-slate-400 font-medium">
-                Respuesta en tiempo real conectada a Supabase
+                Monitoreo automático 24/7 activo
               </span>
             </div>
           </div>
