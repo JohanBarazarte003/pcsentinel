@@ -40,19 +40,19 @@ export default async function DashboardPage() {
   const warningDevices = devices?.filter(d => d.status === "warning" || d.status === "critical").length || 0;
 
   return (
-    <div className="flex min-h-screen bg-sentinel-light text-slate-800">
+    <div className="flex flex-col lg:flex-row min-h-screen bg-sentinel-light text-slate-800">
       
-      {/* Sidebar Navegación Lateral (Fondo Oscuro) */}
+      {/* Sidebar Navegación (Mobile-First: Drawer en móvil, Barra lateral fija en desktop) */}
       <Sidebar />
 
-      {/* Área Principal de Contenido (Fondo Claro) */}
-      <main className="flex-1 p-8 overflow-y-auto">
+      {/* Área Principal de Contenido Responsiva */}
+      <main className="flex-1 p-4 sm:p-8 overflow-y-auto">
         
         {/* Header Dinámico con el Botón de Vincular Computadora */}
         <DashboardHeader orgName={orgName} orgId={orgId} />
 
-        {/* 4 Tarjetas de Estadísticas Principales */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
+        {/* 4 Tarjetas de Estadísticas Principales (1 columna en móvil, 2 en tablet, 4 en PC) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5 mb-8">
           
           {/* Card 1: Equipos en Línea */}
           <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col justify-between">
@@ -129,11 +129,11 @@ export default async function DashboardPage() {
         </div>
 
         {/* Sección Inferior: Tabla de Equipos y Widget de Alertas */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8">
           
-          {/* Tabla de Equipos Monitoreados (8 Columnas) */}
+          {/* Tabla de Equipos Monitoreados (8 Columnas en Desktop) */}
           <div className="lg:col-span-8 bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-            <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+            <div className="p-4 sm:p-6 border-b border-slate-100 flex items-center justify-between">
               <h2 className="text-base font-bold text-slate-900">Estado de los equipos</h2>
               <span className="text-xs text-slate-400 font-medium">Actualizado en tiempo real</span>
             </div>
@@ -142,12 +142,12 @@ export default async function DashboardPage() {
               <table className="w-full text-left text-sm text-slate-600">
                 <thead className="bg-slate-50 text-xs font-semibold uppercase text-slate-400 border-b border-slate-100">
                   <tr>
-                    <th className="px-6 py-3.5">Equipo</th>
-                    <th className="px-6 py-3.5">Estado</th>
-                    <th className="px-6 py-3.5">CPU</th>
-                    <th className="px-6 py-3.5">Memoria</th>
-                    <th className="px-6 py-3.5">Temperatura</th>
-                    <th className="px-6 py-3.5">Última Actividad</th>
+                    <th className="px-4 sm:px-6 py-3.5">Equipo</th>
+                    <th className="px-4 sm:px-6 py-3.5">Estado</th>
+                    <th className="px-4 sm:px-6 py-3.5">CPU</th>
+                    <th className="px-4 sm:px-6 py-3.5">Memoria</th>
+                    <th className="px-4 sm:px-6 py-3.5">Temperatura</th>
+                    <th className="px-4 sm:px-6 py-3.5">Última Actividad</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -157,11 +157,11 @@ export default async function DashboardPage() {
                       
                       return (
                         <tr key={device.id} className="hover:bg-slate-50/80 transition-colors">
-                          <td className="px-6 py-4 font-semibold text-slate-900 flex items-center gap-3">
-                            <Monitor className="w-4 h-4 text-slate-400" />
-                            {device.hostname}
+                          <td className="px-4 sm:px-6 py-4 font-semibold text-slate-900 flex items-center gap-2.5">
+                            <Monitor className="w-4 h-4 text-slate-400 shrink-0" />
+                            <span className="truncate max-w-[140px] sm:max-w-none">{device.hostname}</span>
                           </td>
-                          <td className="px-6 py-4">
+                          <td className="px-4 sm:px-6 py-4">
                             {device.status === "online" ? (
                               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
                                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
@@ -179,12 +179,14 @@ export default async function DashboardPage() {
                               </span>
                             )}
                           </td>
-                          <td className="px-6 py-4 font-medium">{latestMetric.cpu_percent}%</td>
-                          <td className="px-6 py-4 font-medium">{latestMetric.ram_percent}%</td>
-                          <td className="px-6 py-4 font-medium">{latestMetric.cpu_temp ? `${latestMetric.cpu_temp}°C` : "N/A"}</td>
-                          <td className="px-6 py-4 text-xs text-slate-400 flex items-center gap-1.5 mt-2">
-                            <Clock className="w-3.5 h-3.5" />
-                            {new Date(device.last_seen).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          <td className="px-4 sm:px-6 py-4 font-medium">{latestMetric.cpu_percent}%</td>
+                          <td className="px-4 sm:px-6 py-4 font-medium">{latestMetric.ram_percent}%</td>
+                          <td className="px-4 sm:px-6 py-4 font-medium">{latestMetric.cpu_temp ? `${latestMetric.cpu_temp}°C` : "N/A"}</td>
+                          <td className="px-4 sm:px-6 py-4 text-xs text-slate-400 whitespace-nowrap">
+                            <div className="flex items-center gap-1.5">
+                              <Clock className="w-3.5 h-3.5" />
+                              {new Date(device.last_seen).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </div>
                           </td>
                         </tr>
                       );
@@ -202,8 +204,8 @@ export default async function DashboardPage() {
             </div>
           </div>
 
-          {/* Widget Lateral de Alertas (4 Columnas) */}
-          <div className="lg:col-span-4 bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6 flex flex-col justify-between">
+          {/* Widget Lateral de Alertas (4 Columnas en Desktop) */}
+          <div className="lg:col-span-4 bg-white rounded-2xl border border-slate-200/80 shadow-sm p-4 sm:p-6 flex flex-col justify-between">
             <div>
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-base font-bold text-slate-900">Alertas del sistema</h2>
