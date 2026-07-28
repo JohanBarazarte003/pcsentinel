@@ -1,34 +1,47 @@
 import { NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
+import { createClient } from "@supabase/supabase-js";
+
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const key = searchParams.get("key") || "STN-DEMO";
+  const orgId = searchParams.get("org_id");
 
-  // Sanitizar el token por seguridad
   const sanitizedKey = key.replace(/[^A-Z0-9-]/gi, "");
   const customFileName = `PCSentinel_Setup_${sanitizedKey}.exe`;
 
-  // Ruta al instalador binario compilado guardado en la carpeta pública
-  const filePath = path.join(process.cwd(), "public", "downloads", "PCSentinel_Setup.exe");
-
-  // Si el archivo binario no existe aún en el servidor local, avisamos al desarrollador
-  if (!fs.existsSync(filePath)) {
-    return NextResponse.json(
+  // 1. Registrar automáticamente el dispositivo en la base de datos vinculado a la organización
+  if (orgId) {
+    await supabaseAdmin.from("devices").upsert(
       {
-        message: "Para habilitar la descarga directa, compila agent/installer.py con PyInstaller y coloca PCSentinel_Setup.exe en frontend/public/downloads/",
-        downloaded_key: sanitizedKey,
-        expected_filename: customFileName
+        org_id: orgId,
+        device_key: sanitizedKey,
+        hostname: "Pendiente de vinculación...",
+        os_info: "Windows",
+        status: "offline",
       },
-      { status: 200 }
+      { onConflict: "device_key" }
     );
   }
 
-  // Leer el binario
+  // 2. Buscar el ejecutable base
+  const filePath = path.join(process.cwd(), "public", "downloads", "PCSentinel_Setup.exe");
+
+  if (!fs.existsSync(filePath)) {
+    return NextResponse.json(
+      { error: "El ejecutable base no existe aún en public/downloads/" },
+      { status: 404 }
+    );
+  }
+
   const fileBuffer = fs.readFileSync(filePath);
 
-  // Retornar el archivo con las cabeceras HTTP de descarga forzada y nombre dinámico
   return new NextResponse(fileBuffer, {
     status: 200,
     headers: {

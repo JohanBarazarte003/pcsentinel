@@ -16,8 +16,10 @@ export function AddDeviceModal({ isOpen, onClose, orgId }: AddDeviceModalProps) 
 
   if (!isOpen) return null;
 
-  // URL dinámica que fuerza la descarga del instalador .exe renombrado con la clave única del usuario
-  const downloadUrl = `/api/v1/download/installer?key=${deviceKey}`;
+  // =========================================================================
+  // AQUÍ VA LA LÍNEA ACTUALIZADA (PASA EL TOKEN Y EL ID DE LA ORGANIZACIÓN)
+  // =========================================================================
+  const downloadUrl = `/api/v1/download/installer?key=${deviceKey}&org_id=${orgId}`;
   const powerShellCommand = `irm https://pcsentinel.io/install.ps1 | iex -DeviceKey "${deviceKey}"`;
 
   const copyToClipboard = () => {
@@ -101,7 +103,7 @@ export function AddDeviceModal({ isOpen, onClose, orgId }: AddDeviceModalProps) 
             </div>
           </div>
         ) : (
-          /* TAB 2: COMANDO POWERSHELL PARA EMPRESAS Y FLOTAS */
+          /* TAB 2: COMANDO POWERSHELL PARA EMPRESAS */
           <div className="space-y-4">
             <div>
               <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2 flex items-center gap-2">

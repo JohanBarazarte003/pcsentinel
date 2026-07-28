@@ -2,11 +2,11 @@
 
 
 a = Analysis(
-    ['installer.py'],
+    ['sentinel_agent.py'],
     pathex=[],
     binaries=[],
     datas=[],
-    hiddenimports=[],
+    hiddenimports=['unicodedata'],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

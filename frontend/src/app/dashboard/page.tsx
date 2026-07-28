@@ -17,7 +17,7 @@ export default async function DashboardPage() {
   // 1. Obtener el usuario autenticado actual
   const { data: { user } } = await supabase.auth.getUser();
 
-  // 2. Obtener la organización del usuario
+  // 2. Obtener la organización perteneciente a este usuario
   const { data: organization } = await supabase
     .from("organizations")
     .select("id, name")
@@ -27,14 +27,14 @@ export default async function DashboardPage() {
   const orgId = organization?.id || "";
   const orgName = organization?.name || "Mi Organización";
 
-  // 3. Consultar las computadoras pertenecientes a esta organización
+  // 3. Consultar las computadoras registradas bajo esta organización
   const { data: devices } = await supabase
     .from("devices")
     .select("*, telemetry_logs(cpu_percent, ram_percent, cpu_temp, created_at)")
     .eq("org_id", orgId)
     .order("last_seen", { ascending: false });
 
-  // Métricas dinámicas para las tarjetas de estadísticas
+  // Métricas dinámicas para las tarjetas de resumen
   const totalDevices = devices?.length || 0;
   const onlineDevices = devices?.filter(d => d.status === "online").length || 0;
   const warningDevices = devices?.filter(d => d.status === "warning" || d.status === "critical").length || 0;
@@ -42,18 +42,19 @@ export default async function DashboardPage() {
   return (
     <div className="flex min-h-screen bg-sentinel-light text-slate-800">
       
-      {/* Sidebar Navegación Lateral */}
+      {/* Sidebar Navegación Lateral (Fondo Oscuro) */}
       <Sidebar />
 
-      {/* Área Principal */}
+      {/* Área Principal de Contenido (Fondo Claro) */}
       <main className="flex-1 p-8 overflow-y-auto">
         
-        {/* Header Dinámico con Botón de Vincular Computadora */}
+        {/* Header Dinámico con el Botón de Vincular Computadora */}
         <DashboardHeader orgName={orgName} orgId={orgId} />
 
-        {/* 4 Cards de Resumen Principal */}
+        {/* 4 Tarjetas de Estadísticas Principales */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
           
+          {/* Card 1: Equipos en Línea */}
           <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col justify-between">
             <div className="flex justify-between items-start">
               <div>
@@ -72,6 +73,7 @@ export default async function DashboardPage() {
             </div>
           </div>
 
+          {/* Card 2: Alertas Críticas */}
           <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col justify-between">
             <div className="flex justify-between items-start">
               <div>
@@ -90,6 +92,7 @@ export default async function DashboardPage() {
             </div>
           </div>
 
+          {/* Card 3: Rendimiento Promedio */}
           <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col justify-between">
             <div className="flex justify-between items-start">
               <div>
@@ -106,6 +109,7 @@ export default async function DashboardPage() {
             </div>
           </div>
 
+          {/* Card 4: Tiempo de Actividad */}
           <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col justify-between">
             <div className="flex justify-between items-start">
               <div>
@@ -124,9 +128,10 @@ export default async function DashboardPage() {
 
         </div>
 
-        {/* Tabla de Equipos de la Organización */}
+        {/* Sección Inferior: Tabla de Equipos y Widget de Alertas */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           
+          {/* Tabla de Equipos Monitoreados (8 Columnas) */}
           <div className="lg:col-span-8 bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
             <div className="p-6 border-b border-slate-100 flex items-center justify-between">
               <h2 className="text-base font-bold text-slate-900">Estado de los equipos</h2>
@@ -162,6 +167,11 @@ export default async function DashboardPage() {
                                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                                 En línea
                               </span>
+                            ) : device.status === "offline" ? (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                                <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                                Pendiente
+                              </span>
                             ) : (
                               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200">
                                 <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping" />
@@ -192,7 +202,7 @@ export default async function DashboardPage() {
             </div>
           </div>
 
-          {/* Widget Lateral de Alertas */}
+          {/* Widget Lateral de Alertas (4 Columnas) */}
           <div className="lg:col-span-4 bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6 flex flex-col justify-between">
             <div>
               <div className="flex items-center justify-between mb-6">
