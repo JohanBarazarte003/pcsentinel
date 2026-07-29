@@ -13,7 +13,6 @@ import psutil
 import requests
 import unicodedata
 
-# Directorio de datos en AppData/Local/PCSentinel
 APPDATA_DIR = os.path.join(os.getenv('LOCALAPPDATA', os.path.expanduser('~/AppData/Local')), "PCSentinel")
 os.makedirs(APPDATA_DIR, exist_ok=True)
 
@@ -25,13 +24,25 @@ logging.basicConfig(
 )
 
 API_URL = "http://localhost:3000/api/v1/telemetry"
-AGENT_VERSION = "1.2.2"
+AGENT_VERSION = "2.4.0"
 
 def show_popup(msg, title="PC Sentinel"):
     try:
         ctypes.windll.user32.MessageBoxW(0, msg, title, 0x40)
     except Exception:
         pass
+
+def kill_existing_agent():
+    my_pid = os.getpid()
+    for proc in psutil.process_iter(['pid', 'name']):
+        try:
+            p_name = proc.info['name']
+            if p_name and p_name.lower() == 'pcsentinelagent.exe':
+                if proc.info['pid'] != my_pid:
+                    proc.kill()
+        except Exception:
+            pass
+    time.sleep(0.5)
 
 def get_or_save_device_key():
     config_file = os.path.join(APPDATA_DIR, "config.ini")
@@ -69,6 +80,8 @@ def install_and_handoff():
         key = get_or_save_device_key()
         logging.info(f"Instalando en AppData para clave: {key}")
 
+        kill_existing_agent()
+
         try:
             shutil.copy2(current_exe, target_exe)
         except Exception as e:
@@ -86,11 +99,10 @@ def install_and_handoff():
         except Exception as e:
             logging.error(f"Error iniciando proceso instalado: {e}")
 
-        show_popup("¡PC Sentinel se ha instalado con éxito!\n\nMonitoreando Ficha Técnica, Salud SMART y Sensores Térmicos.", "PC Sentinel Activo")
+        show_popup("¡PC Sentinel se ha instalado con éxito!\n\nAnalizando estado de Antivirus y Seguridad de Windows.", "PC Sentinel Activo")
         sys.exit(0)
 
 def find_nvidia_smi_path():
-    """Rastrea la ubicación exacta de nvidia-smi.exe en Windows para la GPU Nvidia"""
     candidates = [
         "nvidia-smi",
         r"C:\Program Files\NVIDIA Corporation\NVSMI\nvidia-smi.exe",
@@ -116,15 +128,147 @@ def find_nvidia_smi_path():
             continue
     return None
 
+def get_windows_security_status():
+    """PASO 2.4: Inspecciona si el Antivirus y el Firewall de Windows están activos"""
+    security = {
+        "antivirus_name": "Windows Defender",
+        "antivirus_active": True,
+        "firewall_active": True
+    }
+    try:
+        ps_script = (
+            "$av = Get-CimInstance -Namespace root\\SecurityCenter2 -ClassName AntivirusProduct -ErrorAction SilentlyContinue | Select-Object -First 1 displayName, productState; "
+            "$fw = Get-CimInstance -Namespace root\\SecurityCenter2 -ClassName FirewallProduct -ErrorAction SilentlyContinue | Select-Object -First 1 displayName, productState; "
+            "@{ "
+            "  av_name = if ($av) { $av.displayName } else { 'Windows Defender' }; "
+            "  av_state = if ($av) { $av.productState } else { 0 }; "
+            "  fw_state = if ($fw) { $fw.productState } else { 0 } "
+            "} | ConvertTo-Json"
+        )
+
+        cmd = f'powershell -NoProfile -ExecutionPolicy Bypass -Command "{ps_script}"'
+        raw_out = subprocess.check_output(cmd, shell=True, text=True, timeout=4)
+
+        if raw_out.strip():
+            data = json.loads(raw_out)
+            if data.get("av_name"):
+                security["antivirus_name"] = str(data["av_name"]).strip()
+            av_st = int(data.get("av_state") or 0)
+            fw_st = int(data.get("fw_state") or 0)
+            security["antivirus_active"] = (av_st > 0)
+            security["firewall_active"] = (fw_st > 0)
+    except Exception as e:
+        logging.error(f"Error consultando SecurityCenter2: {e}")
+
+    return security
+
+def get_top_consuming_processes():
+    processes = []
+    try:
+        for proc in psutil.process_iter(['pid', 'name']):
+            try:
+                p_name = proc.info['name']
+                if p_name and p_name.lower() not in ['system idle process', 'system', 'registry', 'pcsentinelagent.exe']:
+                    p_mem = round(proc.memory_percent(), 1)
+                    p_cpu = round(proc.cpu_percent(interval=None), 1)
+                    processes.append({
+                        "name": str(p_name).strip(),
+                        "cpu_pct": p_cpu,
+                        "ram_pct": p_mem
+                    })
+            except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+                pass
+
+        top_5 = sorted(processes, key=lambda x: (x['ram_pct'], x['cpu_pct']), reverse=True)[:5]
+        return top_5
+    except Exception as e:
+        logging.error(f"Error analizando top procesos: {e}")
+        return []
+
+def get_junk_files_size_gb():
+    total_bytes = 0
+    temp_folder = os.getenv('TEMP') or os.getenv('TMP')
+    if temp_folder and os.path.exists(temp_folder):
+        try:
+            for item in os.listdir(temp_folder):
+                fp = os.path.join(temp_folder, item)
+                if os.path.isfile(fp):
+                    try:
+                        total_bytes += os.path.getsize(fp)
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+    return round(total_bytes / (1024**3), 2)
+
+def get_startup_programs():
+    startup_apps = []
+    registry_paths = [
+        (winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Run"),
+        (winreg.HKEY_LOCAL_MACHINE, r"Software\Microsoft\Windows\CurrentVersion\Run")
+    ]
+    for hkey, subkey in registry_paths:
+        try:
+            key = winreg.OpenKey(hkey, subkey, 0, winreg.KEY_READ)
+            i = 0
+            while True:
+                try:
+                    name, val, _ = winreg.EnumValue(key, i)
+                    s_name = str(name).encode('utf-8', 'ignore').decode('utf-8').strip()
+                    s_path = str(val).encode('utf-8', 'ignore').decode('utf-8').strip()
+                    if s_name and s_name != "PCSentinelAgent":
+                        startup_apps.append({
+                            "name": s_name,
+                            "path": s_path[:120]
+                        })
+                    i += 1
+                except OSError:
+                    break
+            winreg.CloseKey(key)
+        except Exception:
+            pass
+    return startup_apps
+
+def get_corrupted_drivers():
+    corrupted = []
+    try:
+        ps_script = (
+            "$bad = Get-CimInstance Win32_PnPEntity -ErrorAction SilentlyContinue | Where-Object { $_.ConfigManagerErrorCode -ne 0 }; "
+            "if ($bad) { "
+            "  foreach ($d in $bad) { "
+            "    @{ "
+            "      name = [string]$d.Name; "
+            "      error_code = [int]$d.ConfigManagerErrorCode "
+            "    } "
+            "  } | ConvertTo-Json -Depth 2 "
+            "}"
+        )
+
+        cmd = f'powershell -NoProfile -ExecutionPolicy Bypass -Command "{ps_script}"'
+        raw_out = subprocess.check_output(cmd, shell=True, text=True, timeout=4)
+
+        if raw_out.strip():
+            data = json.loads(raw_out)
+            if isinstance(data, dict):
+                data = [data]
+            for drv in data:
+                if isinstance(drv, dict) and drv.get("name"):
+                    corrupted.append({
+                        "name": str(drv.get("name")).strip(),
+                        "error_code": int(drv.get("error_code") or 0)
+                    })
+    except Exception as e:
+        logging.error(f"Error escaneando drivers: {e}")
+
+    return corrupted
+
 def get_cpu_gpu_temperatures(cpu_usage_pct):
-    """Cálculo de Temperatura para CPU e inspección directa de GPU Nvidia 940MX"""
     temps = {
         "cpu_temp": None,
         "gpu_temp": None,
         "is_thermal_throttling": False
     }
 
-    # 1. Temperatura de CPU (WMI con fallback inteligente)
     try:
         cmd_cpu = 'powershell -NoProfile -ExecutionPolicy Bypass -Command "(Get-CimInstance -Namespace root\\wmi -ClassName MSAcpi_ThermalZoneTemperature -ErrorAction SilentlyContinue | Select-Object -First 1).CurrentTemperature"'
         raw_cpu = subprocess.check_output(cmd_cpu, shell=True, text=True, timeout=3)
@@ -140,7 +284,6 @@ def get_cpu_gpu_temperatures(cpu_usage_pct):
         calc_cpu = round(38.0 + (cpu_usage_pct * 0.42), 1)
         temps["cpu_temp"] = min(calc_cpu, 92.0)
 
-    # 2. Temperatura de GPU Nvidia mediante nvidia-smi
     smi_bin = find_nvidia_smi_path()
     if smi_bin:
         try:
@@ -153,7 +296,6 @@ def get_cpu_gpu_temperatures(cpu_usage_pct):
         except Exception as e:
             logging.error(f"Error leyendo nvidia-smi: {e}")
 
-    # Si la GPU Nvidia está suspendida por ahorro de energía (Optimus), igualar a rango térmico de chasis
     if temps["gpu_temp"] is None and temps["cpu_temp"] is not None:
         temps["gpu_temp"] = round(temps["cpu_temp"] - 3.5, 1)
 
@@ -163,7 +305,6 @@ def get_cpu_gpu_temperatures(cpu_usage_pct):
     return temps
 
 def get_full_hardware_specs():
-    """Ficha Técnica Completa + Salud y Tipo de Disco (SSD vs HDD)"""
     total_ram = round(psutil.virtual_memory().total / (1024**3), 1)
     cores = psutil.cpu_count(logical=False) or 0
     threads = psutil.cpu_count(logical=True) or 0
@@ -174,7 +315,12 @@ def get_full_hardware_specs():
         "ram": {"total_gb": total_ram, "speed_mhz": 0, "slots_used": 1, "slots_total": 2},
         "gpus": [],
         "disks": [],
-        "disks_health": []
+        "disks_health": [],
+        "corrupted_drivers": get_corrupted_drivers(),
+        "junk_files_gb": get_junk_files_size_gb(),
+        "startup_programs": get_startup_programs(),
+        "top_processes": get_top_consuming_processes(),
+        "security_status": get_windows_security_status() # <--- PASO 2.4 AGREGADO
     }
 
     try:
@@ -204,13 +350,11 @@ def get_full_hardware_specs():
         if raw_out.strip():
             data = json.loads(raw_out)
 
-            # 1. Placa Madre
             if data.get("mobo_mfg") and str(data["mobo_mfg"]).strip() != "Generico":
                 specs["motherboard"]["manufacturer"] = str(data["mobo_mfg"]).strip()
             if data.get("mobo_model") and str(data["mobo_model"]).strip() != "Generico":
                 specs["motherboard"]["model"] = str(data["mobo_model"]).strip()
 
-            # 2. CPU
             if data.get("cpu_name") and str(data["cpu_name"]).strip() != "CPU":
                 specs["cpu"]["name"] = str(data["cpu_name"]).strip()
             if data.get("cpu_cores") and int(data["cpu_cores"]) > 0:
@@ -218,7 +362,6 @@ def get_full_hardware_specs():
             if data.get("cpu_threads") and int(data["cpu_threads"]) > 0:
                 specs["cpu"]["threads"] = int(data["cpu_threads"])
 
-            # 3. RAM y Slots
             ram_items = data.get("ram_items")
             if isinstance(ram_items, dict):
                 ram_items = [ram_items]
@@ -236,7 +379,6 @@ def get_full_hardware_specs():
             if data.get("ram_total_slots"):
                 specs["ram"]["slots_total"] = int(data["ram_total_slots"])
 
-            # 4. Multi-GPU (Intel + Nvidia / AMD)
             gpu_raw = data.get("gpu_items")
             if isinstance(gpu_raw, dict):
                 gpu_raw = [gpu_raw]
@@ -252,7 +394,6 @@ def get_full_hardware_specs():
                         "vram_gb": vram_gb
                     })
 
-            # 5. Discos y Clasificación SMART (SSD vs HDD)
             disks_raw = data.get("disks")
             if isinstance(disks_raw, dict):
                 disks_raw = [disks_raw]
@@ -323,7 +464,7 @@ def main():
     install_and_handoff()
 
     device_key = get_or_save_device_key()
-    logging.info(f"Servicio PC Sentinel v1.2.2 activo. Key: {device_key}")
+    logging.info(f"Servicio PC Sentinel v2.4.0 activo. Key: {device_key}")
 
     headers = {
         "Authorization": f"Bearer {device_key}",
@@ -336,7 +477,7 @@ def main():
             payload = collect_hardware_metrics()
             if payload:
                 res = requests.post(API_URL, json=payload, headers=headers, timeout=5)
-                logging.info(f"Ficha Técnica + SMART + Térmico enviado. Status HTTP {res.status_code}: {res.text}")
+                logging.info(f"Reporte v2.4.0 enviado. Status HTTP {res.status_code}: {res.text}")
         except Exception as e:
             logging.error(f"Error enviando telemetría: {e}")
 

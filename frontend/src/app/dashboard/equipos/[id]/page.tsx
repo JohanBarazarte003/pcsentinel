@@ -12,7 +12,11 @@ import {
   MemoryStick, 
   Layers, 
   ShieldCheck, 
-  Clock 
+  ShieldAlert,
+  Clock,
+  Trash2,
+  Zap,
+  Lock
 } from "lucide-react";
 
 interface DeviceDetailPageProps {
@@ -31,7 +35,6 @@ export default async function DeviceDetailPage({ params }: DeviceDetailPageProps
     .eq("owner_id", user?.id)
     .single();
 
-  // Consultar la computadora específica con sus especificaciones y métricas
   const { data: device } = await supabase
     .from("devices")
     .select("*, telemetry_logs(*)")
@@ -43,7 +46,6 @@ export default async function DeviceDetailPage({ params }: DeviceDetailPageProps
     notFound();
   }
 
-  // Obtener la última medición enviada por el agente
   const latestTelemetry = device.telemetry_logs?.[device.telemetry_logs.length - 1] || {};
   const specs = device.hardware_specs || {};
 
@@ -52,6 +54,11 @@ export default async function DeviceDetailPage({ params }: DeviceDetailPageProps
   const ram = specs.ram || { total_gb: 0, speed_mhz: 0, slots_used: 0, slots_total: 0 };
   const gpus = specs.gpus || [];
   const disksHealth = specs.disks_health || [];
+  const junkFilesGb = specs.junk_files_gb || 0;
+  const startupPrograms = specs.startup_programs || [];
+  const topProcesses = specs.top_processes || [];
+  const corruptedDrivers = specs.corrupted_drivers || [];
+  const securityStatus = specs.security_status || { antivirus_name: "Windows Defender", antivirus_active: true, firewall_active: true };
 
   return (
     <div className="flex flex-col lg:flex-row min-h-screen bg-sentinel-light text-slate-800">
@@ -103,7 +110,6 @@ export default async function DeviceDetailPage({ params }: DeviceDetailPageProps
         {/* 4 Cards de Sensores Térmicos y Rendimiento en Vivo */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
           
-          {/* CPU Temp */}
           <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm">
             <div className="flex justify-between items-start">
               <div>
@@ -119,7 +125,6 @@ export default async function DeviceDetailPage({ params }: DeviceDetailPageProps
             <p className="text-xs text-slate-400 mt-3 font-medium">Límite alerta: 85°C</p>
           </div>
 
-          {/* GPU Temp */}
           <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm">
             <div className="flex justify-between items-start">
               <div>
@@ -135,7 +140,6 @@ export default async function DeviceDetailPage({ params }: DeviceDetailPageProps
             <p className="text-xs text-slate-400 mt-3 font-medium">Sensor Nvidia Activo</p>
           </div>
 
-          {/* RAM Usage */}
           <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm">
             <div className="flex justify-between items-start">
               <div>
@@ -151,25 +155,124 @@ export default async function DeviceDetailPage({ params }: DeviceDetailPageProps
             <p className="text-xs text-slate-400 mt-3 font-medium">De {ram.total_gb || 8} GB instalados</p>
           </div>
 
-          {/* Disk Usage */}
           <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm">
             <div className="flex justify-between items-start">
               <div>
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Uso de Disco</p>
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Basura Liberable</p>
                 <h3 className="text-3xl font-extrabold text-slate-900 mt-1">
-                  {latestTelemetry.disk_percent || 0}%
+                  {junkFilesGb} <span className="text-sm font-normal text-slate-400">GB</span>
                 </h3>
               </div>
-              <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl">
-                <HardDrive className="w-5 h-5" />
+              <div className="p-3 bg-rose-50 text-rose-600 rounded-xl">
+                <Trash2 className="w-5 h-5" />
               </div>
             </div>
-            <p className="text-xs text-slate-400 mt-3 font-medium">Espacio en unidad principal</p>
+            <p className="text-xs text-slate-400 mt-3 font-medium">Archivos %TEMP% acumulados</p>
           </div>
 
         </div>
 
-        {/* FICHA TÉCNICA VISUAL DE COMPONENTES */}
+        {/* SECCIÓN 1: SALUD DE SOFTWARE Y SEGURIDAD (FASE 2) */}
+        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6 space-y-6">
+          <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+            <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
+              <ShieldCheck className="w-5 h-5 text-sentinel-emerald" />
+              Diagnóstico de Software y Seguridad
+            </h2>
+            <span className="text-xs font-semibold px-3 py-1 rounded-full bg-slate-100 text-slate-600">
+              Sistema Operativo & Procesos
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            
+            {/* Antivirus y Firewall */}
+            <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/60 space-y-3">
+              <div className="flex items-center gap-2 text-xs font-bold text-slate-400 uppercase tracking-wider">
+                <Lock className="w-4 h-4 text-sentinel-emerald" />
+                <span>Seguridad de Windows</span>
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-xs p-2.5 bg-white rounded-lg border border-slate-200">
+                  <span className="font-semibold text-slate-800">{securityStatus.antivirus_name}</span>
+                  {securityStatus.antivirus_active ? (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">Activo</span>
+                  ) : (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">Inactivo</span>
+                  )}
+                </div>
+                <div className="flex items-center justify-between text-xs p-2.5 bg-white rounded-lg border border-slate-200">
+                  <span className="font-semibold text-slate-800">Firewall de Windows</span>
+                  {securityStatus.firewall_active ? (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">Activo</span>
+                  ) : (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">Inactivo</span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Top 5 Procesos Consumidores */}
+            <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/60 space-y-3 md:col-span-2 lg:col-span-2">
+              <div className="flex items-center gap-2 text-xs font-bold text-slate-400 uppercase tracking-wider">
+                <Zap className="w-4 h-4 text-sentinel-emerald" />
+                <span>Top Procesos Consumidores en Vivo</span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {topProcesses.map((proc: any, idx: number) => (
+                  <div key={idx} className="p-2.5 bg-white rounded-lg border border-slate-200 text-xs flex justify-between items-center">
+                    <span className="font-bold text-slate-800 truncate max-w-[140px]">{proc.name}</span>
+                    <div className="flex gap-2 text-[11px]">
+                      <span className="font-semibold text-blue-600">RAM: {proc.ram_pct}%</span>
+                      <span className="font-semibold text-amber-600">CPU: {proc.cpu_pct}%</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Programas de Inicio */}
+            <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/60 space-y-3 md:col-span-2 lg:col-span-2">
+              <div className="flex items-center gap-2 text-xs font-bold text-slate-400 uppercase tracking-wider">
+                <Activity className="w-4 h-4 text-sentinel-emerald" />
+                <span>Programas de Inicio Automático</span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                {startupPrograms.map((prog: any, idx: number) => (
+                  <div key={idx} className="p-2.5 bg-white rounded-lg border border-slate-200 text-xs">
+                    <p className="font-bold text-slate-900 truncate">{prog.name}</p>
+                    <p className="text-[10px] text-slate-400 truncate mt-0.5">{prog.path}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Estado de Drivers */}
+            <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/60 space-y-3">
+              <div className="flex items-center gap-2 text-xs font-bold text-slate-400 uppercase tracking-wider">
+                <ShieldAlert className="w-4 h-4 text-sentinel-emerald" />
+                <span>Estado de Controladores</span>
+              </div>
+              {corruptedDrivers.length > 0 ? (
+                <div className="space-y-1">
+                  {corruptedDrivers.map((drv: any, idx: number) => (
+                    <div key={idx} className="p-2 bg-rose-50 text-rose-700 text-xs font-bold rounded-lg border border-rose-200">
+                      {drv.name} (Código {drv.error_code})
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="p-3 bg-emerald-50 text-emerald-800 rounded-lg text-xs font-bold border border-emerald-200 flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                  <span>0 Drivers Corruptos en Windows</span>
+                </div>
+              )}
+            </div>
+
+          </div>
+        </div>
+
+        {/* SECCIÓN 2: FICHA TÉCNICA VISUAL DE HARDWARE (FASE 1) */}
         <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6 space-y-6">
           <div className="flex items-center justify-between pb-4 border-b border-slate-100">
             <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
