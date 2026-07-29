@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Monitor, Trash2, Clock, Cpu, HardDrive, MemoryStick } from "lucide-react";
+import { Monitor, Trash2, Clock, ChevronRight } from "lucide-react";
 
 interface DeviceListTableProps {
   initialDevices: any[];
@@ -56,25 +57,31 @@ export function DeviceListTable({ initialDevices }: DeviceListTableProps) {
                 key={device.id}
                 className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm space-y-4"
               >
-                {/* Header de la Tarjeta Móvil */}
+                {/* Header de la Tarjeta Móvil Cliqueable hacia Ficha Técnica */}
                 <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2.5 bg-slate-100 rounded-xl text-slate-700">
+                  <Link
+                    href={`/dashboard/equipos/${device.id}`}
+                    className="flex items-center gap-3 group flex-1"
+                  >
+                    <div className="p-2.5 bg-slate-100 rounded-xl text-slate-700 group-hover:bg-sentinel-emerald group-hover:text-slate-950 transition-colors">
                       <Monitor className="w-5 h-5" />
                     </div>
-                    <div>
-                      <h3 className="font-bold text-slate-900 text-sm">{device.hostname}</h3>
-                      <p className="text-xs text-slate-400">{device.os_info}</p>
+                    <div className="flex-1">
+                      <h3 className="font-bold text-slate-900 text-sm group-hover:text-sentinel-emerald transition-colors flex items-center gap-1">
+                        {device.hostname}
+                        <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+                      </h3>
+                      <p className="text-xs text-slate-400 truncate max-w-[160px]">{device.os_info}</p>
                     </div>
-                  </div>
+                  </Link>
 
                   {device.status === "online" ? (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                       En línea
                     </span>
                   ) : (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200 shrink-0">
                       <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
                       Pendiente
                     </span>
@@ -99,7 +106,7 @@ export function DeviceListTable({ initialDevices }: DeviceListTableProps) {
 
                 {/* Footer Móvil con Botón de Acción */}
                 <div className="flex items-center justify-between pt-1 text-xs">
-                  <span className="text-slate-400 flex items-center gap-1 text-[11px]">
+                  <span className="text-slate-400 flex items-center gap-1 text-[11px]" suppressHydrationWarning>
                     <Clock className="w-3.5 h-3.5" />
                     {new Date(device.last_seen).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                   </span>
@@ -107,7 +114,7 @@ export function DeviceListTable({ initialDevices }: DeviceListTableProps) {
                   <button
                     onClick={() => handleUnlink(device.id, device.hostname)}
                     disabled={deletingId === device.id}
-                    className="px-3 py-1.5 rounded-xl border border-rose-200 text-rose-600 bg-rose-50/50 text-xs font-semibold flex items-center gap-1.5 active:scale-95 transition-transform"
+                    className="px-3 py-1.5 rounded-xl border border-rose-200 text-rose-600 bg-rose-50/50 text-xs font-semibold flex items-center gap-1.5 active:scale-95 transition-transform cursor-pointer"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                     <span>{deletingId === device.id ? "Eliminando..." : "Desvincular"}</span>
@@ -153,15 +160,21 @@ export function DeviceListTable({ initialDevices }: DeviceListTableProps) {
                   return (
                     <tr key={device.id} className="hover:bg-slate-50/80 transition-colors">
                       <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="p-2 bg-slate-100 rounded-lg text-slate-600">
+                        <Link
+                          href={`/dashboard/equipos/${device.id}`}
+                          className="flex items-center gap-3 group"
+                        >
+                          <div className="p-2 bg-slate-100 rounded-lg text-slate-600 group-hover:bg-sentinel-emerald group-hover:text-slate-950 transition-colors">
                             <Monitor className="w-4 h-4" />
                           </div>
                           <div>
-                            <p className="font-semibold text-slate-900">{device.hostname}</p>
+                            <p className="font-semibold text-slate-900 group-hover:text-sentinel-emerald transition-colors flex items-center gap-1">
+                              {device.hostname}
+                              <ChevronRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                            </p>
                             <p className="text-xs text-slate-400">{device.os_info}</p>
                           </div>
-                        </div>
+                        </Link>
                       </td>
 
                       <td className="px-6 py-4">
@@ -182,7 +195,7 @@ export function DeviceListTable({ initialDevices }: DeviceListTableProps) {
                       <td className="px-6 py-4 font-medium">{metric.ram_percent}%</td>
                       <td className="px-6 py-4 font-medium">{metric.disk_percent}%</td>
 
-                      <td className="px-6 py-4 text-xs text-slate-400">
+                      <td className="px-6 py-4 text-xs text-slate-400" suppressHydrationWarning>
                         <div className="flex items-center gap-1.5">
                           <Clock className="w-3.5 h-3.5" />
                           {new Date(device.last_seen).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
