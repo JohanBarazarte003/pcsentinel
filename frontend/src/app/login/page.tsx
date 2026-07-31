@@ -33,9 +33,10 @@ export default function LoginPage() {
       }
 
       router.push("/dashboard");
-    } catch (err: any) {
-      setErrorMsg("Credenciales incorrectas o usuario no registrado");
-    } finally {
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : "Credenciales incorrectas o usuario no registrado";
+      setErrorMsg(errorMessage);
+}finally {
       setLoading(false);
     }
   };

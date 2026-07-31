@@ -6,8 +6,22 @@ import { useRouter } from "next/navigation";
 import { Monitor, Trash2, Clock, ChevronRight } from "lucide-react";
 import { UnlinkDeviceModal } from "@/components/dashboard/UnlinkDeviceModal/UnlinkDeviceModal";
 
+export interface Device {
+  id: string;
+  hostname: string;
+  os_info: string;
+  status: string;
+  last_seen: string;
+  telemetry_logs?: Array<{
+    cpu_percent?: number;
+    ram_percent?: number;
+    disk_percent?: number;
+    cpu_temp?: number;
+  }>;
+}
+
 interface DeviceListTableProps {
-  initialDevices: any[];
+  initialDevices: Device[];
 }
 
 export function DeviceListTable({ initialDevices }: DeviceListTableProps) {
@@ -35,9 +49,10 @@ export function DeviceListTable({ initialDevices }: DeviceListTableProps) {
       } else {
         alert(`Error al desvincular: ${data.error || "No se pudo eliminar el equipo"}`);
       }
-    } catch (err) {
+    }catch (err) {
+      console.error("Error al desvincular equipo:", err);
       alert("Error de conexión con el servidor.");
-    }
+}
   };
 
   return (

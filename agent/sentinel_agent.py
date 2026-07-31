@@ -219,11 +219,14 @@ def find_nvidia_smi_path():
     return None
 
 def get_windows_security_status():
+    """PASO 2.4: Inspección matemática por máscara de bits (st & 4096) de Windows Defender"""
     security = {
         "antivirus_name": "Windows Defender",
         "antivirus_active": True,
         "firewall_active": True
     }
+
+    # 1. Consulta C-native de Firewall vía netsh (50ms)
     try:
         raw_fw = subprocess.check_output('netsh advfirewall show allprofiles state', shell=True, text=True, timeout=3)
         if "State" in raw_fw or "Estado" in raw_fw:
@@ -231,13 +234,29 @@ def get_windows_security_status():
                 security["firewall_active"] = True
             elif "OFF" in raw_fw.upper() or "DESACTIVADO" in raw_fw.upper():
                 security["firewall_active"] = False
-
-        cmd_av = 'powershell -NoProfile -ExecutionPolicy Bypass -Command "(Get-CimInstance -Namespace root\\SecurityCenter2 -ClassName AntivirusProduct -ErrorAction SilentlyContinue | Select-Object -First 1).displayName"'
-        raw_av = subprocess.check_output(cmd_av, shell=True, text=True, timeout=5)
-        if raw_av.strip():
-            security["antivirus_name"] = str(raw_av).strip()
     except Exception as e:
-        logging.error(f"Error consultando seguridad: {e}")
+        logging.error(f"Error consultando Firewall: {e}")
+
+    # 2. Inspección por Máscara de Bits en WMI SecurityCenter2 (st & 4096)
+    try:
+        cmd_av = 'powershell -NoProfile -ExecutionPolicy Bypass -Command "$av = Get-CimInstance -Namespace root\\SecurityCenter2 -ClassName AntivirusProduct -ErrorAction SilentlyContinue | Select-Object -First 1; @{ name = $av.displayName; state = $av.productState } | ConvertTo-Json"'
+        raw_av = subprocess.check_output(cmd_av, shell=True, text=True, timeout=4)
+        
+        if raw_av.strip():
+            data_av = json.loads(raw_av)
+            if data_av.get("name"):
+                security["antivirus_name"] = str(data_av["name"]).strip()
+            
+            st = int(data_av.get("state") or 0)
+            
+            # Evaluación binaria del bit 4096 (0x1000)
+            # 397568 = Activo (Bit 4096 encendido)
+            # 393216 = Desactivado (Bit 4096 apagado)
+            is_active = (st & 4096) != 0
+            security["antivirus_active"] = is_active
+            logging.info(f"Estado WMI Antivirus: {st} -> Activo: {is_active}")
+    except Exception as e:
+        logging.error(f"Error consultando Antivirus: {e}")
 
     return security
 

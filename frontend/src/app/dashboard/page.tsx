@@ -38,20 +38,51 @@ export default async function DashboardPage() {
     .eq("org_id", orgId)
     .order("last_seen", { ascending: false });
 
-  // Métricas dinámicas para las tarjetas de resumen
+  // Métricas dinámicas básicas
   const totalDevices = devices?.length || 0;
   const onlineDevices = devices?.filter(d => d.status === "online").length || 0;
   const warningDevices = devices?.filter(d => d.status === "warning" || d.status === "critical").length || 0;
 
-  // Evaluar límite de equipos para cuenta Personal/Gratis (Máximo 1 equipo gratis)
+  // 4. CALCULO DINÁMICO: Rendimiento Promedio (Salud / Capacidad Libre del Sistema)
+  let avgPerformance = 100;
+  if (devices && devices.length > 0) {
+    let totalPerformanceSum = 0;
+    let devicesWithLogs = 0;
+
+    devices.forEach((d) => {
+      const latestLog = d.telemetry_logs?.[0];
+      if (latestLog) {
+        const cpu = Number(latestLog.cpu_percent) || 0;
+        const ram = Number(latestLog.ram_percent) || 0;
+        // Salud individual = 100% - Promedio de carga de CPU y RAM
+        const deviceHealth = Math.max(0, 100 - (cpu + ram) / 2);
+        totalPerformanceSum += deviceHealth;
+        devicesWithLogs++;
+      }
+    });
+
+    if (devicesWithLogs > 0) {
+      avgPerformance = Math.round(totalPerformanceSum / devicesWithLogs);
+    }
+  }
+
+  // 5. CALCULO DINÁMICO: Tiempo de Actividad (Disponibilidad en % de la Flota)
+  let uptimePercent = "100%";
+  if (totalDevices > 0) {
+    const calcUptime = (onlineDevices / totalDevices) * 100;
+    uptimePercent = `${calcUptime % 1 === 0 ? calcUptime.toFixed(0) : calcUptime.toFixed(1)}%`;
+  }
+
+  // Evaluar límite de equipos para cuenta Personal/Gratis
   const isPersonal = (organization?.account_type || "personal") === "personal";
   const isLimitReached = isPersonal && (totalDevices >= 1);
 
   return (
     <div className="flex flex-col lg:flex-row min-h-screen bg-sentinel-light text-slate-800">
       
-        {/* Refresco Automático en Segundo Plano cada 5 Segundos */}
+      {/* Refresco Automático en Segundo Plano cada 5 Segundos */}
       <AutoRefresh intervalMs={5000} />
+
       {/* Sidebar Navegación Lateral (Mobile-First) */}
       <Sidebar />
 
@@ -87,7 +118,7 @@ export default async function DashboardPage() {
           </Link>
         </div>
 
-        {/* 4 Tarjetas de Estadísticas Principales */}
+        {/* 4 Tarjetas de Estadísticas Principales DINÁMICAS */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5 mb-8">
           
           {/* Card 1: Equipos en Línea */}
@@ -128,12 +159,12 @@ export default async function DashboardPage() {
             </div>
           </div>
 
-          {/* Card 3: Rendimiento Promedio */}
+          {/* Card 3: Rendimiento Promedio DINÁMICO */}
           <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col justify-between">
             <div className="flex justify-between items-start">
               <div>
                 <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Rendimiento promedio</p>
-                <h3 className="text-3xl font-extrabold text-slate-900 mt-1">78%</h3>
+                <h3 className="text-3xl font-extrabold text-slate-900 mt-1">{avgPerformance}%</h3>
               </div>
               <div className="p-3 bg-blue-50 text-blue-600 rounded-xl">
                 <Activity className="w-5 h-5" />
@@ -141,16 +172,16 @@ export default async function DashboardPage() {
             </div>
             <div className="flex items-center gap-1 text-xs font-medium text-emerald-600 mt-4">
               <ArrowUpRight className="w-4 h-4" />
-              <span>Carga de trabajo óptima</span>
+              <span>{avgPerformance >= 70 ? "Carga de trabajo óptima" : "Carga de trabajo elevada"}</span>
             </div>
           </div>
 
-          {/* Card 4: Tiempo de Actividad */}
+          {/* Card 4: Tiempo de Actividad DINÁMICO */}
           <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col justify-between">
             <div className="flex justify-between items-start">
               <div>
                 <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Tiempo de actividad</p>
-                <h3 className="text-3xl font-extrabold text-slate-900 mt-1">99.6%</h3>
+                <h3 className="text-3xl font-extrabold text-slate-900 mt-1">{uptimePercent}</h3>
               </div>
               <div className="p-3 bg-indigo-50 text-indigo-600 rounded-xl">
                 <CheckCircle2 className="w-5 h-5" />
@@ -158,7 +189,7 @@ export default async function DashboardPage() {
             </div>
             <div className="flex items-center gap-1 text-xs font-medium text-emerald-600 mt-4">
               <ArrowUpRight className="w-4 h-4" />
-              <span>Estabilidad del servicio</span>
+              <span>{onlineDevices === totalDevices ? "Disponibilidad completa" : `${onlineDevices} de ${totalDevices} respondiendo`}</span>
             </div>
           </div>
 
@@ -231,7 +262,7 @@ export default async function DashboardPage() {
                     <tr>
                       <td colSpan={6} className="px-6 py-12 text-center text-slate-400 text-sm">
                         No hay computadoras vinculadas a <strong className="text-slate-700">{orgName}</strong>.<br />
-                        Haz clic en <strong className="text-sentinel-emerald">"+ Vincular Computadora"</strong> para conectar tu primer equipo.
+                        Haz clic en <strong className="text-sentinel-emerald font-bold">&quot;+ Vincular Computadora&quot;</strong> para conectar tu primer equipo.
                       </td>
                     </tr>
                   )}

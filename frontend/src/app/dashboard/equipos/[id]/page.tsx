@@ -2,7 +2,6 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { Sidebar } from "@/components/dashboard/Sidebar";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { AutoRefresh } from "@/components/common/AutoRefresh";
 import { 
   Monitor, 
   ArrowLeft, 
@@ -21,6 +20,35 @@ import {
 } from "lucide-react";
 import { RemediationPanel } from "@/components/dashboard/RemediationPanel";
 import { DeviceDetailTabs } from "@/components/dashboard/DeviceDetailTabs";
+
+// DEFINICIÓN DE INTERFACES DE TYPESCRIPT (ELIMINA LOS ERRORES DE :any)
+interface ProcessItem {
+  name: string;
+  ram_pct: number;
+  cpu_pct: number;
+}
+
+interface ProgramItem {
+  name: string;
+  path: string;
+}
+
+interface DriverItem {
+  name: string;
+  error_code: number;
+}
+
+interface GpuItem {
+  name: string;
+  vram_gb: number;
+}
+
+interface DiskHealthItem {
+  name: string;
+  type: string;
+  health: string;
+  is_healthy: boolean;
+}
 
 interface DeviceDetailPageProps {
   params: Promise<{ id: string }>;
@@ -55,19 +83,16 @@ export default async function DeviceDetailPage({ params }: DeviceDetailPageProps
   const motherboard = specs.motherboard || { manufacturer: "LENOVO", model: "BaseBoard" };
   const cpu = specs.cpu || { name: "Procesador Intel/AMD", cores: 0, threads: 0 };
   const ram = specs.ram || { total_gb: 0, speed_mhz: 0, slots_used: 0, slots_total: 0 };
-  const gpus = specs.gpus || [];
-  const disksHealth = specs.disks_health || [];
+  const gpus: GpuItem[] = specs.gpus || [];
+  const disksHealth: DiskHealthItem[] = specs.disks_health || [];
   const junkFilesGb = specs.junk_files_gb || 0;
-  const startupPrograms = specs.startup_programs || [];
-  const topProcesses = specs.top_processes || [];
-  const corruptedDrivers = specs.corrupted_drivers || [];
+  const startupPrograms: ProgramItem[] = specs.startup_programs || [];
+  const topProcesses: ProcessItem[] = specs.top_processes || [];
+  const corruptedDrivers: DriverItem[] = specs.corrupted_drivers || [];
   const securityStatus = specs.security_status || { antivirus_name: "Windows Defender", antivirus_active: true, firewall_active: true };
 
   return (
     <div className="flex flex-col lg:flex-row min-h-screen bg-sentinel-light text-slate-800">
-
-       {/* Refresco Automático Térmico cada 3 Segundos */}
-      <AutoRefresh intervalMs={3000} />
       <Sidebar />
 
       <main className="flex-1 p-4 sm:p-8 overflow-y-auto space-y-6 sm:space-y-8">
@@ -234,7 +259,7 @@ export default async function DeviceDetailPage({ params }: DeviceDetailPageProps
                     <span>Top Procesos Consumidores en Vivo</span>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {topProcesses.map((proc: any, idx: number) => (
+                    {topProcesses.map((proc: ProcessItem, idx: number) => (
                       <div key={idx} className="p-2.5 bg-white rounded-lg border border-slate-200 text-xs flex justify-between items-center">
                         <span className="font-bold text-slate-800 truncate max-w-[140px]">{proc.name}</span>
                         <div className="flex gap-2 text-[11px]">
@@ -253,7 +278,7 @@ export default async function DeviceDetailPage({ params }: DeviceDetailPageProps
                     <span>Programas de Inicio Automático</span>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                    {startupPrograms.map((prog: any, idx: number) => (
+                    {startupPrograms.map((prog: ProgramItem, idx: number) => (
                       <div key={idx} className="p-2.5 bg-white rounded-lg border border-slate-200 text-xs">
                         <p className="font-bold text-slate-900 truncate">{prog.name}</p>
                         <p className="text-[10px] text-slate-400 truncate mt-0.5">{prog.path}</p>
@@ -270,7 +295,7 @@ export default async function DeviceDetailPage({ params }: DeviceDetailPageProps
                   </div>
                   {corruptedDrivers.length > 0 ? (
                     <div className="space-y-1">
-                      {corruptedDrivers.map((drv: any, idx: number) => (
+                      {corruptedDrivers.map((drv: DriverItem, idx: number) => (
                         <div key={idx} className="p-2 bg-rose-50 text-rose-700 text-xs font-bold rounded-lg border border-rose-200">
                           {drv.name} (Código {drv.error_code})
                         </div>
@@ -342,7 +367,7 @@ export default async function DeviceDetailPage({ params }: DeviceDetailPageProps
                     <span>Tarjetas Gráficas (Dual GPU)</span>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                    {gpus.map((gpu: any, idx: number) => (
+                    {gpus.map((gpu: GpuItem, idx: number) => (
                       <div key={idx} className="p-2.5 bg-white rounded-lg border border-slate-200 text-xs">
                         <p className="font-bold text-slate-900">{gpu.name}</p>
                         <p className="text-slate-400 font-mono mt-0.5">VRAM: {gpu.vram_gb} GB</p>
@@ -358,7 +383,7 @@ export default async function DeviceDetailPage({ params }: DeviceDetailPageProps
                     <span>Almacenamiento SMART</span>
                   </div>
                   <div className="space-y-2 pt-1">
-                    {disksHealth.map((d: any, idx: number) => (
+                    {disksHealth.map((d: DiskHealthItem, idx: number) => (
                       <div key={idx} className="p-2.5 bg-white rounded-lg border border-slate-200 text-xs flex items-center justify-between">
                         <div>
                           <p className="font-bold text-slate-900 truncate max-w-[150px]">{d.name}</p>
