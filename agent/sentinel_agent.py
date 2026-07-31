@@ -27,8 +27,8 @@ logging.basicConfig(
     format='%(asctime)s - [PC SENTINEL ENGINE] - %(levelname)s - %(message)s'
 )
 
-API_URL = "http://localhost:3000/api/v1/telemetry"
-ACTION_COMPLETE_URL = "http://localhost:3000/api/v1/actions/complete"
+API_URL = "https://pcsentinel.vercel.app/api/v1/telemetry"
+ACTION_COMPLETE_URL = "https://pcsentinel.vercel.app/api/v1/actions/complete"
 AGENT_VERSION = "3.1.0"
 
 def show_popup(msg, title="PC Sentinel"):
