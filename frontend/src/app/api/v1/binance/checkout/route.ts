@@ -25,7 +25,8 @@ export async function POST(request: Request) {
       merchantName: process.env.NEXT_PUBLIC_BINANCE_PAY_NAME || "PC Sentinel Cloud",
     });
 
-  } catch (err: any) {
-    return NextResponse.json({ error: "Error procesando pago con Binance", details: err.message }, { status: 500 });
+  } catch (err: unknown) {
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    return NextResponse.json({ error: "Error procesando pago con Binance", details: errorMessage }, { status: 500 });
   }
 }

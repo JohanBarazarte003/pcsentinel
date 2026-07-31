@@ -54,7 +54,8 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true, message: "Dispositivo desvinculado con éxito" });
 
-  } catch (err: any) {
-    return NextResponse.json({ error: "Error desvinculando dispositivo", details: err.message }, { status: 500 });
+  } catch (err: unknown) {
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    return NextResponse.json({ error: "Error desvinculando dispositivo", details: errorMessage }, { status: 500 });
   }
 }
