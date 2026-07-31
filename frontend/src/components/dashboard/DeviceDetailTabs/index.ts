@@ -1,0 +1,1 @@
+export { DeviceDetailTabs } from "./DeviceDetailTabs";

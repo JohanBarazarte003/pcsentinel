@@ -4,7 +4,8 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { Shield, Activity, ArrowRight, Lock, Mail } from "lucide-react";
+import { Logo } from "@/components/ui/Logo";
+import { ArrowRight, Lock, Mail, CheckSquare, Square } from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -12,6 +13,7 @@ export default function LoginPage() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [rememberMe, setRememberMe] = useState(true);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
@@ -44,12 +46,8 @@ export default function LoginPage() {
         
         {/* Logo Header */}
         <div className="flex flex-col items-center mb-8">
-          <div className="relative flex items-center justify-center w-12 h-12 rounded-2xl bg-slate-800 border border-slate-700 text-sentinel-emerald mb-3">
-            <Shield className="w-7 h-7 absolute" />
-            <Activity className="w-5 h-5 text-sentinel-emerald z-10" />
-          </div>
-          <h1 className="text-2xl font-bold text-white tracking-tight">Iniciar Sesión</h1>
-          <p className="text-sm text-sentinel-slate mt-1">Ingresa a tu panel de control de PC Sentinel</p>
+          <Logo showLink={false} />
+          <p className="text-xs text-sentinel-slate mt-3">Ingresa a tu panel de control de PC Sentinel</p>
         </div>
 
         {/* Form Card */}
@@ -96,10 +94,29 @@ export default function LoginPage() {
               </div>
             </div>
 
+            {/* Checkbox Mantener Sesión Iniciada */}
+            <div className="flex items-center justify-between text-xs pt-1">
+              <label 
+                onClick={() => setRememberMe(!rememberMe)}
+                className="flex items-center gap-2 text-slate-300 cursor-pointer select-none"
+              >
+                {rememberMe ? (
+                  <CheckSquare className="w-4 h-4 text-sentinel-emerald" />
+                ) : (
+                  <Square className="w-4 h-4 text-slate-600" />
+                )}
+                <span>Mantener sesión iniciada</span>
+              </label>
+
+              <Link href="/register" className="text-sentinel-emerald hover:underline text-[11px]">
+                ¿Olvidaste tu contraseña?
+              </Link>
+            </div>
+
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 px-4 bg-sentinel-emerald hover:bg-emerald-400 text-slate-950 font-semibold rounded-xl transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 disabled:opacity-50 mt-2"
+              className="w-full py-3 px-4 bg-sentinel-emerald hover:bg-emerald-400 text-slate-950 font-semibold rounded-xl transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 disabled:opacity-50 mt-2 cursor-pointer"
             >
               {loading ? "Ingresando..." : "Iniciar Sesión"}
               <ArrowRight className="w-4 h-4" />

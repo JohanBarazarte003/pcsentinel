@@ -16,8 +16,31 @@ export async function GET(request: Request) {
   const sanitizedKey = key.replace(/[^A-Z0-9-]/gi, "");
   const customFileName = `PCSentinel_Setup_${sanitizedKey}.exe`;
 
-  // 1. Registrar automáticamente el dispositivo en la base de datos vinculado a la organización
   if (orgId) {
+    // 1. Consultar tipo de cuenta y cantidad de equipos ya vinculados
+    const { data: org } = await supabaseAdmin
+      .from("organizations")
+      .select("account_type")
+      .eq("id", orgId)
+      .single();
+
+    const { count: deviceCount } = await supabaseAdmin
+      .from("devices")
+      .select("id", { count: "exact", head: true })
+      .eq("org_id", orgId);
+
+    // REFINAMIENTO 3: Si la cuenta es Personal y ya tiene 1 equipo, bloquear el registro de un segundo equipo
+    if (org?.account_type === "personal" && (deviceCount || 0) >= 1) {
+      return NextResponse.json(
+        { 
+          error: "Límite de 1 equipo alcanzado para cuentas de Uso Personal.",
+          message: "Para vincular más computadoras, por favor actualiza tu cuenta a Plan Pro o Empresa en la sección Configuración."
+        },
+        { status: 403 }
+      );
+    }
+
+    // 2. Registrar el dispositivo si está dentro del límite
     await supabaseAdmin.from("devices").upsert(
       {
         org_id: orgId,
@@ -30,7 +53,6 @@ export async function GET(request: Request) {
     );
   }
 
-  // 2. Buscar el ejecutable base
   const filePath = path.join(process.cwd(), "public", "downloads", "PCSentinel_Setup.exe");
 
   if (!fs.existsSync(filePath)) {

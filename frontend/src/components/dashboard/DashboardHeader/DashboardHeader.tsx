@@ -1,15 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, Monitor } from "lucide-react";
-import { AddDeviceModal } from "@/components/dashboard/AddDeviceModal";
+import { Plus } from "lucide-react";
+import { AddDeviceModal } from "@/components/dashboard/AddDeviceModal/AddDeviceModal";
 
 interface DashboardHeaderProps {
   orgName: string;
   orgId: string;
+  isLimitReached?: boolean;
 }
 
-export function DashboardHeader({ orgName, orgId }: DashboardHeaderProps) {
+export function DashboardHeader({ orgName, orgId, isLimitReached = false }: DashboardHeaderProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   return (
@@ -42,7 +43,10 @@ export function DashboardHeader({ orgName, orgId }: DashboardHeaderProps) {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         orgId={orgId}
+        isLimitReached={isLimitReached}
       />
     </>
   );
 }
+
+export default DashboardHeader;

@@ -1,0 +1,1 @@
+export { BinancePayModal } from "./BinancePayModal";

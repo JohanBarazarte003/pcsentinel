@@ -1,6 +1,8 @@
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { Sidebar } from "@/components/dashboard/Sidebar";
-import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
+import { DashboardHeader } from "@/components/dashboard/DashboardHeader/DashboardHeader";
+import Link from "next/link";
+import { AutoRefresh } from "@/components/common/AutoRefresh";
 import { 
   Monitor, 
   AlertTriangle, 
@@ -8,7 +10,9 @@ import {
   CheckCircle2, 
   Clock, 
   ArrowUpRight, 
-  ArrowDownRight 
+  ArrowDownRight,
+  Zap,
+  Sparkles
 } from "lucide-react";
 
 export default async function DashboardPage() {
@@ -20,7 +24,7 @@ export default async function DashboardPage() {
   // 2. Obtener la organización perteneciente a este usuario
   const { data: organization } = await supabase
     .from("organizations")
-    .select("id, name")
+    .select("id, name, account_type")
     .eq("owner_id", user?.id)
     .single();
 
@@ -39,19 +43,51 @@ export default async function DashboardPage() {
   const onlineDevices = devices?.filter(d => d.status === "online").length || 0;
   const warningDevices = devices?.filter(d => d.status === "warning" || d.status === "critical").length || 0;
 
+  // Evaluar límite de equipos para cuenta Personal/Gratis (Máximo 1 equipo gratis)
+  const isPersonal = (organization?.account_type || "personal") === "personal";
+  const isLimitReached = isPersonal && (totalDevices >= 1);
+
   return (
     <div className="flex flex-col lg:flex-row min-h-screen bg-sentinel-light text-slate-800">
       
-      {/* Sidebar Navegación (Mobile-First: Drawer en móvil, Barra lateral fija en desktop) */}
+        {/* Refresco Automático en Segundo Plano cada 5 Segundos */}
+      <AutoRefresh intervalMs={5000} />
+      {/* Sidebar Navegación Lateral (Mobile-First) */}
       <Sidebar />
 
       {/* Área Principal de Contenido Responsiva */}
       <main className="flex-1 p-4 sm:p-8 overflow-y-auto">
         
-        {/* Header Dinámico con el Botón de Vincular Computadora */}
-        <DashboardHeader orgName={orgName} orgId={orgId} />
+        {/* Header Dinámico con Indicador de Límite de Equipos */}
+        <DashboardHeader orgName={orgName} orgId={orgId} isLimitReached={isLimitReached} />
 
-        {/* 4 Tarjetas de Estadísticas Principales (1 columna en móvil, 2 en tablet, 4 en PC) */}
+        {/* Banner Promocional para Adquirir Plan Multidispositivo */}
+        <div className="mb-8 p-5 sm:p-6 rounded-2xl bg-gradient-to-r from-slate-900 via-slate-850 to-slate-900 text-white border border-slate-800 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div className="flex items-start gap-4">
+            <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-sentinel-emerald rounded-2xl shrink-0">
+              <Sparkles className="w-6 h-6 animate-pulse" />
+            </div>
+            <div className="space-y-1">
+              <h3 className="text-base sm:text-lg font-extrabold flex items-center gap-2">
+                ¿Necesitas monitorear varias computadoras?
+                <span className="text-[10px] uppercase bg-sentinel-emerald text-slate-950 px-2 py-0.5 rounded-full font-bold">Multidispositivo</span>
+              </h3>
+              <p className="text-xs sm:text-sm text-slate-300 max-w-2xl leading-relaxed">
+                Adquiere un Plan Pro ($4.99 USDT) o Empresa ($29.00 USDT) para conectar ilimitadas laptops o desktops, habilitar alertas térmicas automáticas por email e informes ejecutivos.
+              </p>
+            </div>
+          </div>
+
+          <Link
+            href="/dashboard/configuracion"
+            className="w-full md:w-auto px-5 py-3 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg active:scale-95 shrink-0"
+          >
+            <Zap className="w-4 h-4 fill-slate-950 stroke-[2.5]" />
+            <span>Adquirir Plan Multidispositivo</span>
+          </Link>
+        </div>
+
+        {/* 4 Tarjetas de Estadísticas Principales */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5 mb-8">
           
           {/* Card 1: Equipos en Línea */}
@@ -182,7 +218,7 @@ export default async function DashboardPage() {
                           <td className="px-4 sm:px-6 py-4 font-medium">{latestMetric.cpu_percent}%</td>
                           <td className="px-4 sm:px-6 py-4 font-medium">{latestMetric.ram_percent}%</td>
                           <td className="px-4 sm:px-6 py-4 font-medium">{latestMetric.cpu_temp ? `${latestMetric.cpu_temp}°C` : "N/A"}</td>
-                          <td className="px-4 sm:px-6 py-4 text-xs text-slate-400 whitespace-nowrap">
+                          <td className="px-4 sm:px-6 py-4 text-xs text-slate-400 whitespace-nowrap" suppressHydrationWarning>
                             <div className="flex items-center gap-1.5">
                               <Clock className="w-3.5 h-3.5" />
                               {new Date(device.last_seen).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}

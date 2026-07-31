@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Monitor, Trash2, Clock, ChevronRight } from "lucide-react";
+import { UnlinkDeviceModal } from "@/components/dashboard/UnlinkDeviceModal/UnlinkDeviceModal";
 
 interface DeviceListTableProps {
   initialDevices: any[];
@@ -12,14 +13,12 @@ interface DeviceListTableProps {
 export function DeviceListTable({ initialDevices }: DeviceListTableProps) {
   const router = useRouter();
   const [devices, setDevices] = useState(initialDevices);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [unlinkTarget, setUnlinkTarget] = useState<{ id: string; hostname: string } | null>(null);
 
-  const handleUnlink = async (deviceId: string, hostname: string) => {
-    if (!confirm(`¿Estás seguro de que deseas desvincular el equipo "${hostname}"?`)) {
-      return;
-    }
+  const confirmUnlink = async () => {
+    if (!unlinkTarget) return;
 
-    setDeletingId(deviceId);
+    const deviceId = unlinkTarget.id;
 
     try {
       const response = await fetch("/api/v1/devices/delete", {
@@ -28,25 +27,23 @@ export function DeviceListTable({ initialDevices }: DeviceListTableProps) {
         body: JSON.stringify({ deviceId }),
       });
 
-      if (response.ok) {
-        setDevices(devices.filter((d) => d.id !== deviceId));
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        setDevices((prev) => prev.filter((d) => d.id !== deviceId));
         router.refresh();
       } else {
-        alert("Error al desvincular el equipo.");
+        alert(`Error al desvincular: ${data.error || "No se pudo eliminar el equipo"}`);
       }
     } catch (err) {
       alert("Error de conexión con el servidor.");
-    } finally {
-      setDeletingId(null);
     }
   };
 
   return (
     <div className="space-y-4">
       
-      {/* ================================================================= */}
-      {/* VISTA MÓVIL (< 640px): Tarjetas Apiladas (Mobile-First Pattern)    */}
-      {/* ================================================================= */}
+      {/* VISTA MÓVIL (< 640px) */}
       <div className="block sm:hidden space-y-3">
         {devices.length > 0 ? (
           devices.map((device) => {
@@ -57,7 +54,6 @@ export function DeviceListTable({ initialDevices }: DeviceListTableProps) {
                 key={device.id}
                 className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm space-y-4"
               >
-                {/* Header de la Tarjeta Móvil Cliqueable hacia Ficha Técnica */}
                 <div className="flex items-start justify-between gap-3">
                   <Link
                     href={`/dashboard/equipos/${device.id}`}
@@ -88,7 +84,6 @@ export function DeviceListTable({ initialDevices }: DeviceListTableProps) {
                   )}
                 </div>
 
-                {/* Métrica de Hardware Móvil */}
                 <div className="grid grid-cols-3 gap-2 py-2 px-3 bg-slate-50 rounded-xl border border-slate-100 text-center text-xs">
                   <div>
                     <span className="text-[10px] uppercase font-bold text-slate-400 block">CPU</span>
@@ -104,7 +99,6 @@ export function DeviceListTable({ initialDevices }: DeviceListTableProps) {
                   </div>
                 </div>
 
-                {/* Footer Móvil con Botón de Acción */}
                 <div className="flex items-center justify-between pt-1 text-xs">
                   <span className="text-slate-400 flex items-center gap-1 text-[11px]" suppressHydrationWarning>
                     <Clock className="w-3.5 h-3.5" />
@@ -112,12 +106,11 @@ export function DeviceListTable({ initialDevices }: DeviceListTableProps) {
                   </span>
 
                   <button
-                    onClick={() => handleUnlink(device.id, device.hostname)}
-                    disabled={deletingId === device.id}
+                    onClick={() => setUnlinkTarget({ id: device.id, hostname: device.hostname })}
                     className="px-3 py-1.5 rounded-xl border border-rose-200 text-rose-600 bg-rose-50/50 text-xs font-semibold flex items-center gap-1.5 active:scale-95 transition-transform cursor-pointer"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
-                    <span>{deletingId === device.id ? "Eliminando..." : "Desvincular"}</span>
+                    <span>Desvincular</span>
                   </button>
                 </div>
               </div>
@@ -130,9 +123,7 @@ export function DeviceListTable({ initialDevices }: DeviceListTableProps) {
         )}
       </div>
 
-      {/* ================================================================= */}
-      {/* VISTA DESKTOP (≥ 640px): Tabla Tradicional                        */}
-      {/* ================================================================= */}
+      {/* VISTA DESKTOP (≥ 640px) */}
       <div className="hidden sm:block bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
         <div className="p-6 border-b border-slate-100 flex items-center justify-between">
           <h2 className="text-base font-bold text-slate-900">Lista de Dispositivos</h2>
@@ -204,12 +195,11 @@ export function DeviceListTable({ initialDevices }: DeviceListTableProps) {
 
                       <td className="px-6 py-4 text-right">
                         <button
-                          onClick={() => handleUnlink(device.id, device.hostname)}
-                          disabled={deletingId === device.id}
+                          onClick={() => setUnlinkTarget({ id: device.id, hostname: device.hostname })}
                           className="px-3 py-1.5 rounded-lg border border-rose-200 text-rose-600 hover:bg-rose-50 text-xs font-semibold transition-colors flex items-center gap-1.5 ml-auto cursor-pointer"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
-                          <span>{deletingId === device.id ? "Eliminando..." : "Desvincular"}</span>
+                          <span>Desvincular</span>
                         </button>
                       </td>
                     </tr>
@@ -226,6 +216,16 @@ export function DeviceListTable({ initialDevices }: DeviceListTableProps) {
           </table>
         </div>
       </div>
+
+      {/* MODAL CORPORATIVO DE DESVINCULACIÓN */}
+      {unlinkTarget && (
+        <UnlinkDeviceModal
+          isOpen={!!unlinkTarget}
+          onClose={() => setUnlinkTarget(null)}
+          onConfirm={confirmUnlink}
+          hostname={unlinkTarget.hostname}
+        />
+      )}
 
     </div>
   );
