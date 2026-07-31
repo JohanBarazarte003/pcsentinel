@@ -146,7 +146,7 @@
  [],
  False,
  False,
- 1785350384,
+ 1785423178,
  [('runw.exe',
    'D:\\tecnicovirtual\\pc-sentinel\\agent\\venv\\Lib\\site-packages\\PyInstaller\\bootloader\\Windows-64bit-intel\\runw.exe',
    'EXECUTABLE')],

@@ -9,14 +9,18 @@ import platform
 import ctypes
 import subprocess
 import json
+import msvcrt # <--- Bloqueo nativo de Windows para instancia única
 import psutil
 import requests
 import unicodedata
 
+# Directorio de datos en AppData/Local/PCSentinel
 APPDATA_DIR = os.path.join(os.getenv('LOCALAPPDATA', os.path.expanduser('~/AppData/Local')), "PCSentinel")
 os.makedirs(APPDATA_DIR, exist_ok=True)
 
 LOG_FILE = os.path.join(APPDATA_DIR, "pcsentinel.log")
+LOCK_FILE = os.path.join(APPDATA_DIR, "sentinel.lock")
+
 logging.basicConfig(
     filename=LOG_FILE,
     level=logging.INFO,
@@ -24,7 +28,8 @@ logging.basicConfig(
 )
 
 API_URL = "http://localhost:3000/api/v1/telemetry"
-AGENT_VERSION = "2.4.0"
+ACTION_COMPLETE_URL = "http://localhost:3000/api/v1/actions/complete"
+AGENT_VERSION = "3.1.0"
 
 def show_popup(msg, title="PC Sentinel"):
     try:
@@ -32,7 +37,18 @@ def show_popup(msg, title="PC Sentinel"):
     except Exception:
         pass
 
+def acquire_singleton_lock():
+    """Garantiza que SOLO exista 1 instancia de PC Sentinel ejecutándose en Windows"""
+    try:
+        lock_fd = open(LOCK_FILE, 'w')
+        msvcrt.locking(lock_fd.fileno(), msvcrt.LK_NBLCK, 1)
+        return lock_fd
+    except (IOError, OSError):
+        # Si ya hay otra instancia activa, salir silenciosamente
+        sys.exit(0)
+
 def kill_existing_agent():
+    """Mata cualquier proceso previo antes de actualizar el .exe"""
     my_pid = os.getpid()
     for proc in psutil.process_iter(['pid', 'name']):
         try:
@@ -99,8 +115,82 @@ def install_and_handoff():
         except Exception as e:
             logging.error(f"Error iniciando proceso instalado: {e}")
 
-        show_popup("¡PC Sentinel se ha instalado con éxito!\n\nAnalizando estado de Antivirus y Seguridad de Windows.", "PC Sentinel Activo")
+        show_popup("¡PC Sentinel v3.1 instalado con éxito!\n\nRemediación en 1-Clic para Firewall y Basura activa.", "PC Sentinel Activo")
         sys.exit(0)
+
+# =========================================================================
+# MOTOR DE REMEDIACIÓN Y REPARACIÓN EN 1-CLIC (FASE 3)
+# =========================================================================
+
+def execute_clean_temp():
+    freed_bytes = 0
+    temp_folder = os.getenv('TEMP') or os.getenv('TMP')
+    if temp_folder and os.path.exists(temp_folder):
+        for item in os.listdir(temp_folder):
+            fp = os.path.join(temp_folder, item)
+            try:
+                if os.path.isfile(fp):
+                    sz = os.path.getsize(fp)
+                    os.remove(fp)
+                    freed_bytes += sz
+                elif os.path.isdir(fp):
+                    shutil.rmtree(fp, ignore_errors=True)
+            except Exception:
+                pass
+    freed_gb = round(freed_bytes / (1024**3), 2)
+    return f"Limpieza completada. Se liberaron {freed_gb} GB de espacio en disco."
+
+def execute_enable_firewall():
+    try:
+        res = subprocess.run('netsh advfirewall set allprofiles state on', shell=True, capture_output=True, text=True, timeout=5)
+        if res.returncode == 0:
+            return "Firewall de Windows activado con éxito en todos los perfiles."
+
+        cmd_elevated = 'powershell -NoProfile -ExecutionPolicy Bypass -Command "Start-Process netsh -ArgumentList \'advfirewall set allprofiles state on\' -Verb RunAs -WindowStyle Hidden"'
+        subprocess.Popen(cmd_elevated, shell=True)
+        return "Solicitud de elevación enviada. El Firewall se ha activado."
+    except Exception as e:
+        return f"Error activando firewall: {e}"
+
+def execute_flush_dns():
+    try:
+        subprocess.check_output('ipconfig /flushdns', shell=True, timeout=5)
+        return "Caché de resolución DNS de Windows restablecida correctamente."
+    except Exception as e:
+        return f"Error en flushdns: {e}"
+
+def process_remediation_actions(actions):
+    for act in actions:
+        action_id = act.get("id")
+        cmd_type = act.get("command_type")
+        logging.info(f"Ejecutando remediación remota: {cmd_type} (ID: {action_id})")
+
+        result_msg = "Acción ejecutada con éxito."
+        status = "completed"
+
+        try:
+            if cmd_type == "CLEAN_TEMP":
+                result_msg = execute_clean_temp()
+            elif cmd_type == "ENABLE_FIREWALL":
+                result_msg = execute_enable_firewall()
+            elif cmd_type == "FLUSH_DNS":
+                result_msg = execute_flush_dns()
+            else:
+                result_msg = "Comando desconocido."
+                status = "failed"
+        except Exception as e:
+            result_msg = f"Error ejecutando remediación: {e}"
+            status = "failed"
+
+        try:
+            requests.post(ACTION_COMPLETE_URL, json={
+                "actionId": action_id,
+                "status": status,
+                "resultMessage": result_msg
+            }, timeout=5)
+            logging.info(f"Resultado de remediación enviado a la web: {result_msg}")
+        except Exception as e:
+            logging.error(f"Error reportando resultado: {e}")
 
 def find_nvidia_smi_path():
     candidates = [
@@ -129,36 +219,25 @@ def find_nvidia_smi_path():
     return None
 
 def get_windows_security_status():
-    """PASO 2.4: Inspecciona si el Antivirus y el Firewall de Windows están activos"""
     security = {
         "antivirus_name": "Windows Defender",
         "antivirus_active": True,
         "firewall_active": True
     }
     try:
-        ps_script = (
-            "$av = Get-CimInstance -Namespace root\\SecurityCenter2 -ClassName AntivirusProduct -ErrorAction SilentlyContinue | Select-Object -First 1 displayName, productState; "
-            "$fw = Get-CimInstance -Namespace root\\SecurityCenter2 -ClassName FirewallProduct -ErrorAction SilentlyContinue | Select-Object -First 1 displayName, productState; "
-            "@{ "
-            "  av_name = if ($av) { $av.displayName } else { 'Windows Defender' }; "
-            "  av_state = if ($av) { $av.productState } else { 0 }; "
-            "  fw_state = if ($fw) { $fw.productState } else { 0 } "
-            "} | ConvertTo-Json"
-        )
+        raw_fw = subprocess.check_output('netsh advfirewall show allprofiles state', shell=True, text=True, timeout=3)
+        if "State" in raw_fw or "Estado" in raw_fw:
+            if "ON" in raw_fw.upper() or "ACTIVADO" in raw_fw.upper():
+                security["firewall_active"] = True
+            elif "OFF" in raw_fw.upper() or "DESACTIVADO" in raw_fw.upper():
+                security["firewall_active"] = False
 
-        cmd = f'powershell -NoProfile -ExecutionPolicy Bypass -Command "{ps_script}"'
-        raw_out = subprocess.check_output(cmd, shell=True, text=True, timeout=4)
-
-        if raw_out.strip():
-            data = json.loads(raw_out)
-            if data.get("av_name"):
-                security["antivirus_name"] = str(data["av_name"]).strip()
-            av_st = int(data.get("av_state") or 0)
-            fw_st = int(data.get("fw_state") or 0)
-            security["antivirus_active"] = (av_st > 0)
-            security["firewall_active"] = (fw_st > 0)
+        cmd_av = 'powershell -NoProfile -ExecutionPolicy Bypass -Command "(Get-CimInstance -Namespace root\\SecurityCenter2 -ClassName AntivirusProduct -ErrorAction SilentlyContinue | Select-Object -First 1).displayName"'
+        raw_av = subprocess.check_output(cmd_av, shell=True, text=True, timeout=5)
+        if raw_av.strip():
+            security["antivirus_name"] = str(raw_av).strip()
     except Exception as e:
-        logging.error(f"Error consultando SecurityCenter2: {e}")
+        logging.error(f"Error consultando seguridad: {e}")
 
     return security
 
@@ -233,15 +312,10 @@ def get_corrupted_drivers():
     corrupted = []
     try:
         ps_script = (
-            "$bad = Get-CimInstance Win32_PnPEntity -ErrorAction SilentlyContinue | Where-Object { $_.ConfigManagerErrorCode -ne 0 }; "
-            "if ($bad) { "
-            "  foreach ($d in $bad) { "
-            "    @{ "
-            "      name = [string]$d.Name; "
-            "      error_code = [int]$d.ConfigManagerErrorCode "
-            "    } "
-            "  } | ConvertTo-Json -Depth 2 "
-            "}"
+            "Get-CimInstance Win32_PnPEntity -ErrorAction SilentlyContinue | "
+            "Where-Object { $_.ConfigManagerErrorCode -ne 0 } | "
+            "ForEach-Object { @{ name = [string]$_.Name; error_code = [int]$_.ConfigManagerErrorCode } } | "
+            "ConvertTo-Json -Depth 2"
         )
 
         cmd = f'powershell -NoProfile -ExecutionPolicy Bypass -Command "{ps_script}"'
@@ -320,7 +394,7 @@ def get_full_hardware_specs():
         "junk_files_gb": get_junk_files_size_gb(),
         "startup_programs": get_startup_programs(),
         "top_processes": get_top_consuming_processes(),
-        "security_status": get_windows_security_status() # <--- PASO 2.4 AGREGADO
+        "security_status": get_windows_security_status()
     }
 
     try:
@@ -463,8 +537,11 @@ def collect_hardware_metrics():
 def main():
     install_and_handoff()
 
+    # Garantizar que SOLO EXISTA 1 INSTANCIA activa en memoria
+    lock = acquire_singleton_lock()
+
     device_key = get_or_save_device_key()
-    logging.info(f"Servicio PC Sentinel v2.4.0 activo. Key: {device_key}")
+    logging.info(f"Servicio PC Sentinel v3.1.0 (Instancia Única) activo. Key: {device_key}")
 
     headers = {
         "Authorization": f"Bearer {device_key}",
@@ -477,7 +554,14 @@ def main():
             payload = collect_hardware_metrics()
             if payload:
                 res = requests.post(API_URL, json=payload, headers=headers, timeout=5)
-                logging.info(f"Reporte v2.4.0 enviado. Status HTTP {res.status_code}: {res.text}")
+                logging.info(f"Reporte v3.1.0 enviado. Status HTTP {res.status_code}: {res.text}")
+
+                if res.status_code == 200:
+                    data = res.json()
+                    pending = data.get("pending_actions", [])
+                    if pending:
+                        process_remediation_actions(pending)
+
         except Exception as e:
             logging.error(f"Error enviando telemetría: {e}")
 

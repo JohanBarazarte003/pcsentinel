@@ -2,6 +2,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { Sidebar } from "@/components/dashboard/Sidebar";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { RemediationPanel } from "@/components/dashboard/RemediationPanel";
 import { 
   Monitor, 
   ArrowLeft, 
@@ -271,6 +272,13 @@ export default async function DeviceDetailPage({ params }: DeviceDetailPageProps
 
           </div>
         </div>
+
+        {/* PANELS DE REMEDIACIÓN Y ASISTENCIA REMOTA EN 1-CLIC (FASE 3) */}
+            <RemediationPanel
+                deviceId={device.id}
+                junkGb={junkFilesGb}
+                firewallActive={securityStatus.firewall_active}
+            />
 
         {/* SECCIÓN 2: FICHA TÉCNICA VISUAL DE HARDWARE (FASE 1) */}
         <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6 space-y-6">
