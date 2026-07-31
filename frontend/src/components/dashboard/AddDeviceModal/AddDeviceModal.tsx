@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Download, Monitor, Copy, Check, Terminal, X, ShieldAlert, QrCode } from "lucide-react";
+import { Download, Monitor, Copy, Check, Terminal, X, ShieldAlert, QrCode, ShieldCheck } from "lucide-react";
 import BinancePayModal from "@/components/dashboard/BinancePayModal/BinancePayModal";
 
 interface AddDeviceModalProps {
@@ -41,7 +41,7 @@ export function AddDeviceModal({
           {/* Botón Cerrar */}
           <button 
             onClick={onClose}
-            className="absolute top-4 right-4 text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors"
+            className="absolute top-4 right-4 text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -97,6 +97,7 @@ export function AddDeviceModal({
                 </div>
               </div>
 
+              {/* Pestañas: Modo Fácil (.EXE) vs Modo Avanzado (PowerShell) */}
               <div className="flex border-b border-slate-800 mb-6">
                 <button
                   onClick={() => setActiveTab("exe")}
@@ -120,8 +121,9 @@ export function AddDeviceModal({
                 </button>
               </div>
 
+              {/* TAB 1: DESCARGA .EXE */}
               {activeTab === "exe" ? (
-                <div className="space-y-6 text-center py-4">
+                <div className="space-y-5 text-center py-2">
                   <div className="p-6 bg-slate-950 border border-slate-800 rounded-2xl space-y-4">
                     <Download className="w-12 h-12 text-sentinel-emerald mx-auto animate-bounce" />
                     <div>
@@ -140,8 +142,20 @@ export function AddDeviceModal({
                       <span>Descargar PCSentinel_Setup_{deviceKey}.exe</span>
                     </a>
                   </div>
+
+                  {/* Caja de Garantía y Nota de Seguridad para SmartScreen */}
+                  <div className="p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-left text-xs space-y-1">
+                    <p className="font-bold text-sentinel-emerald flex items-center gap-1.5 text-[11px]">
+                      <ShieldCheck className="w-4 h-4 text-sentinel-emerald shrink-0" />
+                      <span>Garantía de Seguridad de PC Sentinel</span>
+                    </p>
+                    <p className="text-slate-400 text-[11px] leading-relaxed">
+                      Si tu navegador o Windows SmartScreen muestra un aviso de <em>&quot;Archivo no común&quot;</em> por ser un ejecutable nuevo, haz clic en <strong>&quot;Conservar&quot;</strong> o <strong>&quot;Ejecutar de todos modos&quot;</strong>. Nuestro instalador es 100% seguro y libre de malware.
+                    </p>
+                  </div>
                 </div>
               ) : (
+                /* TAB 2: POWERSHELL PARA EMPRESAS */
                 <div className="space-y-4">
                   <div>
                     <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2 flex items-center gap-2">
@@ -153,7 +167,7 @@ export function AddDeviceModal({
                       <span className="truncate">{powerShellCommand}</span>
                       <button
                         onClick={copyToClipboard}
-                        className="bg-slate-800 hover:bg-slate-700 text-white px-3 py-1.5 rounded-lg flex items-center gap-1.5 text-xs font-sans font-medium transition-colors shrink-0"
+                        className="bg-slate-800 hover:bg-slate-700 text-white px-3 py-1.5 rounded-lg flex items-center gap-1.5 text-xs font-sans font-medium transition-colors shrink-0 cursor-pointer"
                       >
                         {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
                         <span>{copied ? "Copiado" : "Copiar"}</span>
