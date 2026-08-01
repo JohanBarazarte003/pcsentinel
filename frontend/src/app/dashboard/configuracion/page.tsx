@@ -2,6 +2,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { Sidebar } from "@/components/dashboard/Sidebar";
 import { User, QrCode } from "lucide-react";
 import CheckoutButton from "@/components/dashboard/CheckoutButton/CheckoutButton";
+import ChangePasswordForm from "@/components/dashboard/ChangePasswordForm/ChangePasswordForm";
 
 export default async function ConfiguracionPage() {
   const supabase = await createServerSupabaseClient();
@@ -32,6 +33,8 @@ export default async function ConfiguracionPage() {
               Perfil del Usuario
             </h2>
 
+            
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
               <div>
                 <label className="block text-[10px] sm:text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">
@@ -44,6 +47,8 @@ export default async function ConfiguracionPage() {
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-slate-700 font-medium"
                 />
               </div>
+
+             
 
               <div>
                 <label className="block text-[10px] sm:text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">
@@ -58,6 +63,9 @@ export default async function ConfiguracionPage() {
               </div>
             </div>
           </div>
+
+
+           <ChangePasswordForm />
 
           {/* Card Suscripción & Pagos Binance Pay */}
           <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-4 sm:p-6 space-y-4">

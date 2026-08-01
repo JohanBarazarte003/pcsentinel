@@ -118,9 +118,9 @@ def install_and_handoff():
         show_popup("¡PC Sentinel v3.1 instalado con éxito!\n\nRemediación en 1-Clic para Firewall y Basura activa.", "PC Sentinel Activo")
         sys.exit(0)
 
-# =========================================================================
-# MOTOR DE REMEDIACIÓN Y REPARACIÓN EN 1-CLIC (FASE 3)
-# =========================================================================
+# =========================================================================#
+# MOTOR DE REMEDIACIÓN Y REPARACIÓN EN 1-CLIC (FASE 3)                     #
+# =========================================================================#
 
 def execute_clean_temp():
     freed_bytes = 0
